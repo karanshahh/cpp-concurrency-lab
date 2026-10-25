@@ -26,7 +26,7 @@ does not need it.
 Two synchronizes-with edges exist: **tail** (producer to consumer: "data is ready") and **head** (consumer to producer:
 "slot is free"). That is the whole algorithm.
 
-`scripts/mutation_check.sh` weakens each of these orders in a copy of the code, one at a time, and requires the
+`scripts/mutation_check.py` weakens each of these orders in a copy of the code, one at a time, and requires the
 ThreadSanitizer build of the tests to fail. A memory-order change that no test notices would mean the justification above
 is untested.
 

@@ -4,7 +4,7 @@
 //   ./race mutex    same, protected by std::mutex
 //   ./race atomic   same, std::atomic<long>
 //
-// Build it under ThreadSanitizer (./scripts/build.sh tsan) and run ./build-tsan/race race:
+// Build it under ThreadSanitizer (python3 scripts/build.py tsan) and run ./build-tsan/race race:
 // TSan prints "WARNING: ThreadSanitizer: data race". With the mutex and atomic modes it is silent.
 //
 // NOTE: in an optimised build without sanitizers the compiler may fold the loop into one add and the

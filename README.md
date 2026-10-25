@@ -130,7 +130,7 @@ the same input. Queue benchmarks send sequence numbers. Nothing is downloaded.
 | Edge cases | zero capacity, capacity 1 and 2, non-power-of-two (rejected by SPSC), wrap-around, full, empty, close with a blocked producer and consumer, submit after shutdown, task exceptions, 0 and 1 pipeline items |
 | Stress | 4 producers x 4 consumers on the blocking queue; 2-thread stress (capacity 1024 and 2) on every SPSC queue; fill/drain cycles that force stale cached indices |
 | Sanitizers | all tests under ASan+UBSan, under TSan, and in Release |
-| Mutation check | `scripts/mutation_check.sh` breaks one thing at a time in a copy of the repo (including each memory order in the SPSC queue); the tests must fail |
+| Mutation check | `scripts/mutation_check.py` breaks one thing at a time in a copy of the repo (including each memory order in the SPSC queue); the tests must fail |
 | CI | the same three builds on GitHub's x86 runners, plus a Release smoke run |
 
 ## Build, test, run
@@ -138,9 +138,9 @@ the same input. Queue benchmarks send sequence numbers. Nothing is downloaded.
 Inside the Linux VM:
 
 ```bash
-./scripts/build.sh all          # ASan+UBSan, TSan, Release: build and run every test
-./scripts/build.sh asan         # or one at a time: asan | tsan | release
-./scripts/mutation_check.sh     # every mutation must be reported "caught"
+python3 scripts/build.py all          # ASan+UBSan, TSan, Release: build and run every test
+python3 scripts/build.py asan         # or one at a time: asan | tsan | release
+python3 scripts/mutation_check.py     # every mutation must be reported "caught"
 
 ./build-tsan/race race          # data race: TSan reports it
 ./build-tsan/race mutex         # fixed with std::mutex: TSan silent
@@ -150,14 +150,14 @@ Inside the Linux VM:
 ./build-release/false_sharing
 
 # reproducible benchmark run, saved to results/ (choose CPUs that exist: see `nproc`)
-BENCH_ARGS="--pin 2,3" FS_ARGS="--pin 2,3" PIPE_ARGS="--pin 2,3,4" ./scripts/run_bench.sh vm-v2
+BENCH_ARGS="--pin 2,3" FS_ARGS="--pin 2,3" PIPE_ARGS="--pin 2,3,4" python3 scripts/run_bench.py vm-v2
 ```
 
 To measure v1 as it was, use a worktree of its tag (the v1 tools have no `false_sharing`, `--queue` or SPSC rows):
 
 ```bash
 git worktree add ../cpp-concurrency-lab-v1 v1.0.0
-cd ../cpp-concurrency-lab-v1 && ./scripts/run_bench.sh vm-v1
+cd ../cpp-concurrency-lab-v1 && python3 ../cpp-concurrency-lab/scripts/run_bench.py vm-v1
 cp results/vm-v1-*.txt ../cpp-concurrency-lab/results/
 ```
 
@@ -165,7 +165,7 @@ cp results/vm-v1-*.txt ../cpp-concurrency-lab/results/
 
 ### Method
 
-Release build (`-O3 -DNDEBUG`), no sanitizers; the programs print a warning otherwise. `scripts/run_bench.sh` records machine,
+Release build (`-O3 -DNDEBUG`), no sanitizers; the programs print a warning otherwise. `scripts/run_bench.py` records machine,
 kernel, CPU, governor, compiler, flags, git commit and the exact commands in `results/`. Each benchmark repeats its
 measurement 3 times and each cell is a **range across the 3 runs**, never the best run. Producer and consumer start together behind a
 flag; the first messages of every latency run are discarded as warm-up. Throughput: unthrottled producer, items / wall time,
@@ -292,7 +292,7 @@ include/cclab/     platform.hpp, latency_recorder.hpp, mutex_queue.hpp, bounded_
 tools/             race.cpp (data-race demo), pipeline_demo.cpp
 bench/             bench_queues.cpp, false_sharing.cpp
 tests/             GoogleTest suites; queue_types.hpp lists the queue types the typed tests run over
-scripts/           build.sh, run_bench.sh, mutation_check.sh
+scripts/           build.py, run_bench.py, mutation_check.py
 docs/              design.md, MEMORY_ORDERS.md
 results/           raw benchmark output (one file per run)
 .github/workflows/ ci.yml

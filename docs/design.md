@@ -36,7 +36,7 @@ under `data/`. Replaying real ITCH data through these queues is left to the late
 ## What will be measured, and what "done" means
 
 Measured: Release only; machine, compiler, flags, workload, seed recorded by
-`scripts/run_bench.sh`; 3 runs, results reported as ranges; latency as p50 / p99 / p99.9 / max, never a mean;
+`scripts/run_bench.py`; 3 runs, results reported as ranges; latency as p50 / p99 / p99.9 / max, never a mean;
 throughput separately; the clock resolution reported; compared queues run the same operations; conclusions labelled
 **shown** or **likely**.
 
@@ -59,7 +59,7 @@ Done for v2: the same, plus TSan-clean stress tests for every SPSC queue, a writ
 | Determinism | same operation log -> same results; same pipeline seed -> same checksum, repeated runs |
 | Edge cases | empty, full, capacity 1 and 2, non-power-of-two (rejected by SPSC), zero capacity, close with blocked producer/consumer, submit after shutdown, exceptions through futures, zero and one pipeline item |
 | Sanitizers | all tests under ASan+UBSan, TSan, and Release |
-| Mutation check | `scripts/mutation_check.sh` breaks one thing at a time in a copy; the tests must fail |
+| Mutation check | `scripts/mutation_check.py` breaks one thing at a time in a copy; the tests must fail |
 | CI | GitHub Actions on x86 runners: the three builds plus a Release smoke run |
 
 ## Concepts exercised
