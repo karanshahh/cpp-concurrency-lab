@@ -129,23 +129,43 @@ clock's measured resolution is printed with the results; per-message times close
 ### v1 (VM numbers)
 
 <!-- v1-results:begin -->
-Machine, compiler, flags, workload, seed: --
+Machine: OrbStack Ubuntu VM on an Apple Silicon Mac (aarch64, 8 vCPUs, kernel 7.2.12-orbstack), GCC 15.2.0,
+`-O3 -DNDEBUG`, no sanitizers. Clock resolution: 41 ns. Raw output: `results/vm-v1-20261025-044554.txt`.
+
+Queues: 1 producer pinned to CPU 2, 1 consumer pinned to CPU 3, capacity 1024, 3 runs. Throughput: 2,000,000 items,
+unthrottled. Latency: 500,000 items paced every 2,000 ns, first 20,000 discarded. Seed: n/a (fixed schedule).
 
 | Queue | Throughput (Mops/s) | p50 (ns) | p99 (ns) | p99.9 (ns) | max (ns) |
 |---|---|---|---|---|---|
-| MutexQueue (lock + spin) | -- | -- | -- | -- | -- |
-| BoundedBlockingQueue (cv) | -- | -- | -- | -- | -- |
+| MutexQueue (lock + spin) | 4.87-5.78 | 303-351 | 13,776-215,309 | 70,994-1,624,070 | 195,146-2,090,153 |
+| BoundedBlockingQueue (cv) | 4.83-5.42 | 4,752-5,423 | 48,432-55,122 | 66,833-188,918 | 219,965-830,087 |
 
-Pipeline (`pipeline_demo`, feed->strategy, ns): p50 -- / p99 -- / p99.9 -- / max --
+Pipeline (`pipeline_demo`, cv queue): 1,000,000 ticks paced every 1,000 ns, first 10,000 discarded,
+seed 88172645463325252, capacity 4096, feed/book/strategy pinned to CPUs 2/3/4, **one run** (not three).
+Output matched the single-threaded reference (1,000,000 received, 0 order violations).
+
+| Stage | p50 (ns) | p99 (ns) | p99.9 (ns) | max (ns) |
+|---|---|---|---|---|
+| feed->book | 6,921 | 7,005,470 | 10,748,415 | 11,249,162 |
+| feed->strategy | 16,478 | 7,066,825 | 10,812,372 | 11,292,288 |
 <!-- v1-results:end -->
 
 ## What the numbers show
 
 <!-- v1-shown:begin -->
 ### v1
-- **Shown (measured):** --
-- **Likely (hypothesis, not yet shown):** --
-- **To measure next:** --
+- **Shown (measured):** both queues move about 5 million messages per second between two pinned threads
+  (4.83-5.78 Mops/s across all runs). Under paced load the cv queue's median latency is about 14-18 times the mutex
+  queue's (4,752-5,423 ns vs 303-351 ns). The mutex queue's tail swings widely between runs (p99.9 from 71 us to
+  1.6 ms); the cv queue's p99 is steady (48-55 us). The cv pipeline delivers every tick correctly, but at one tick per
+  microsecond its p99 is about 7 ms.
+- **Likely (hypothesis, not yet shown):** the cv queue's median is mostly the cost of waking a sleeping consumer
+  through the kernel on each item, which the spinning mutex queue avoids. The mutex queue's unstable tail comes from the
+  spinning consumer and the producer competing for the lock, sometimes while the lock holder is descheduled by the host.
+  The pipeline's millisecond p99 is backlog: at one tick per microsecond the cv handoff sometimes falls behind, the
+  4,096-slot queues fill, and because latency counts from each tick's scheduled time, that waiting shows up (as it should).
+- **To measure next:** the pipeline repeated 3 times; the pipeline at slower tick rates (2,000 and 5,000 ns) to find
+  where the backlog disappears; the same workloads on lock-free SPSC queues (v2).
 <!-- v1-shown:end -->
 
 ## Repository layout
