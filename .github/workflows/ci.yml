@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main, 'v[0-9]*']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: asan-ubsan
+            build_type: Debug
+            sanitize: "address,undefined"
+          - name: tsan
+            build_type: Debug
+            sanitize: "thread"
+          - name: release
+            build_type: Release
+            sanitize: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Work around TSan + high-entropy ASLR on new kernels
+        if: matrix.name == 'tsan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DSANITIZE="${{ matrix.sanitize }}"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Release smoke run (tiny sizes; CI timings are never recorded as results)
+        if: matrix.name == 'release'
+        run: |
+          build/bench_queues --items 20000 --lat-items 5000 --warmup 500 --runs 1
+          build/pipeline_demo --items 20000
