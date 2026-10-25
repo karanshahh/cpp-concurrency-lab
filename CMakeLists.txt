@@ -77,5 +77,6 @@ if(CCLAB_BUILD_TESTS)
   cclab_warnings(cclab_tests)
 
   include(GoogleTest)
-  gtest_discover_tests(cclab_tests PROPERTIES TIMEOUT 300)
+  set(CCLAB_TEST_TIMEOUT 300 CACHE STRING "Per-test timeout in seconds (the mutation check sets 20)")
+  gtest_discover_tests(cclab_tests PROPERTIES TIMEOUT ${CCLAB_TEST_TIMEOUT})
 endif()
