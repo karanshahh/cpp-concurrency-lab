@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(cpp_concurrency_lab VERSION 1.0.0 LANGUAGES CXX)
+project(cpp_concurrency_lab VERSION 2.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,6 +44,10 @@ if(NOT SANITIZE)
   add_executable(bench_queues bench/bench_queues.cpp)
   target_link_libraries(bench_queues PRIVATE cclab)
   cclab_warnings(bench_queues)
+
+  add_executable(false_sharing bench/false_sharing.cpp)
+  target_link_libraries(false_sharing PRIVATE cclab)
+  cclab_warnings(false_sharing)
 else()
   message(STATUS "benchmarks are not built under sanitizers")
 endif()
@@ -66,6 +70,7 @@ if(CCLAB_BUILD_TESTS)
     tests/test_latency_recorder.cpp
     tests/test_pipeline.cpp
     tests/test_queues_reference.cpp
+    tests/test_spsc.cpp
     tests/test_thread_pool.cpp)
   target_include_directories(cclab_tests PRIVATE tests)
   target_link_libraries(cclab_tests PRIVATE cclab GTest::gtest_main)

@@ -38,4 +38,7 @@ jobs:
         if: matrix.name == 'release'
         run: |
           build/bench_queues --items 20000 --lat-items 5000 --warmup 500 --runs 1
-          build/pipeline_demo --items 20000
+          build/false_sharing --iters 200000 --runs 1
+          build/pipeline_demo --items 20000 --queue cv
+          build/pipeline_demo --items 20000 --queue acqrel
+          build/pipeline_demo --items 20000 --queue cached

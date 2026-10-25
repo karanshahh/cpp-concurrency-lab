@@ -1,4 +1,5 @@
-// bench_queues.cpp - throughput and latency of the v1 queues, 1 producer / 1 consumer.
+// bench_queues.cpp - throughput and latency of the v1 queues and the v2 lock-free queues,
+// 1 producer / 1 consumer.
 //
 // THROUGHPUT: producer pushes --items messages unthrottled; consumer drains them.
 //             Mops/s = items / wall time. Message order is verified (a mismatch prints ORDER VIOLATION).
@@ -29,6 +30,7 @@
 #include "cclab/latency_recorder.hpp"
 #include "cclab/mutex_queue.hpp"
 #include "cclab/platform.hpp"
+#include "cclab/spsc_queue.hpp"
 
 using namespace cclab;
 
@@ -87,7 +89,7 @@ Args parse(int argc, char** argv) {
 }
 
 // Adapters give every queue the same push(msg) / pop(msg&) shape.
-// MutexQueue only has try_*, so it spins. The cv queue uses its real blocking calls.
+// MutexQueue and the SPSC queues only have try_*, so they spin. The cv queue uses its real blocking calls.
 template <class Q>
 auto spin_push(Q& q) {
   return [&q](const Msg& m) {
@@ -216,7 +218,7 @@ void bench(const char* name, const Args& a, MkPush mk_push, MkPop mk_pop) {
 
 int main(int argc, char** argv) {
   const Args a = parse(argc, argv);
-  std::printf("bench_queues v1 | compiler: %s\n", __VERSION__);
+  std::printf("bench_queues v2 | compiler: %s\n", __VERSION__);
   if (const char* w = build_warning()) std::printf("WARNING: %s\n", w);
   std::printf("workload: items=%zu (throughput), lat_items=%zu warmup=%zu interval_ns=%llu (latency), capacity=%zu, runs=%zu\n",
               a.items, a.lat_items, a.warmup, static_cast<unsigned long long>(a.interval_ns), a.capacity, a.runs);
@@ -232,6 +234,14 @@ int main(int argc, char** argv) {
                          [](auto& q) { return spin_pop(q); });
   bench<BoundedBlockingQueue<Msg>>("BoundedBlockingQueue (cv)", a, [](auto& q) { return block_push(q); },
                                    [](auto& q) { return block_pop(q); });
+  bench<SpscQueueSeqCst<Msg>>("SpscQueueSeqCst", a, [](auto& q) { return spin_push(q); },
+                              [](auto& q) { return spin_pop(q); });
+  bench<SpscQueueAcqRel<Msg, true>>("SpscQueueAcqRel (padded)", a, [](auto& q) { return spin_push(q); },
+                                    [](auto& q) { return spin_pop(q); });
+  bench<SpscQueueAcqRel<Msg, false>>("SpscQueueAcqRel (UNPADDED)", a, [](auto& q) { return spin_push(q); },
+                                     [](auto& q) { return spin_pop(q); });
+  bench<SpscQueueCached<Msg>>("SpscQueueCached", a, [](auto& q) { return spin_push(q); },
+                              [](auto& q) { return spin_pop(q); });
   if (g_pin_failed.load()) std::printf("WARNING: a pin_this_thread() call failed; results are NOT pinned\n");
   return 0;
 }
