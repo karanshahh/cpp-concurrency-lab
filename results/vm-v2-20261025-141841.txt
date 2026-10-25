@@ -1,0 +1,262 @@
+# VM numbers (OrbStack Ubuntu, aarch64, shared host; Chrome open, idle)
+label:        vm-v2
+date:         2026-10-25T19:18:41Z (UTC)
+git:          v1.0.0-1-g46998a2 (46998a2)
+kernel:       Linux 7.2.12-orbstack-00394-gbecdd6130068 aarch64
+nproc:        7
+cpu governor: performance
+--- lscpu (head) ---
+Architecture:                            aarch64
+CPU op-mode(s):                          64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  8
+On-line CPU(s) list:                     0-7
+Vendor ID:                               Apple
+Model name:                              -
+Model:                                   0
+Thread(s) per core:                      1
+Core(s) per cluster:                     8
+Socket(s):                               -
+Cluster(s):                              1
+Stepping:                                0x0
+CPU(s) scaling MHz:                      100%
+CPU max MHz:                             2000.0000
+CPU min MHz:                             2000.0000
+BogoMIPS:                                48.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 asimdfhm dit uscat ilrcpc flagm sb dcpodp flagm2 frint
+L1d cache:                               1 MiB (8 instances)
+L1i cache:                               1.5 MiB (8 instances)
+--- cmake cache (compiler and flags) ---
+CMAKE_BUILD_TYPE:STRING=Release
+CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
+CMAKE_CXX_FLAGS:STRING=
+CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
+SANITIZE:STRING=
+--- method ---
+Release build, no sanitizers; each benchmark repeats its measurement 3 times; ranges across runs; see README 'Method'
+commands:
+  build-release/bench_queues --pin 2,3
+  build-release/false_sharing --pin 2,3
+  build-release/pipeline_demo --queue <cv|mutex|seqcst|acqrel|acqrel-unpadded|cached> --pin 2,3,4   (3 runs per queue)
+
+=== bench_queues ===
+bench_queues v2 | compiler: 15.2.0
+workload: items=2000000 (throughput), lat_items=500000 warmup=20000 interval_ns=2000 (latency), capacity=1024, runs=3
+seed: n/a (deterministic schedule) | hw_threads=8 | kCacheLine=128
+clock resolution: 41 ns
+pinning: producer cpu 2, consumer cpu 3
+every cell = range across 3 runs (lowest-highest); latency in ns
+queue                        Mops/s         | p50          p99            p99.9            max               
+MutexQueue (lock+spin)       2.94-4.04      | 314-10002301 53429-199083596 208753-204059708 592927-204847874  
+BoundedBlockingQueue (cv)    5.17-5.53      | 5020-5555    51382-56729    129960-2020873   303846-2709080    
+SpscQueueSeqCst              16.12-19.29    | 147-156      709-5490       13528-38836      78382-162728      
+SpscQueueAcqRel (padded)     15.62-17.98    | 146-149      665-1657       7733-35336       47464-251467      
+SpscQueueAcqRel (UNPADDED)   14.56-18.28    | 153-161      6247-166960    37220-2261317    319832-3183108    
+SpscQueueCached              13.67-25.56    | 106-119      1474-15557     41420-57837      159481-669344     
+
+=== false_sharing ===
+false_sharing v2 | compiler: 15.2.0
+workload: iters/thread=20000000 runs=3 kCacheLine=128 hw_threads=8
+seed: n/a | clock resolution: 41 ns
+pinning: cpu 2 and cpu 3
+lower is better
+adjacent (same line)       runs(ms): 308.9 326.6 353.9   range 308.9-353.9 ms
+padded (own line each)     runs(ms): 42.8 43.4 44.7   range 42.8-44.7 ms
+
+=== pipeline_demo --queue cv (run 1 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=cv (BoundedBlockingQueue) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book           13958    127881     534699       771031   (990000 samples)
+feed->strategy       27303    187597     621532       866373   (990000 samples)
+
+=== pipeline_demo --queue cv (run 2 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=cv (BoundedBlockingQueue) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book           12762    104226     373052       720551   (990000 samples)
+feed->strategy       24871    141888     488978       778093   (990000 samples)
+
+=== pipeline_demo --queue cv (run 3 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=cv (BoundedBlockingQueue) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book           13455    108656     194632       527402   (990000 samples)
+feed->strategy       25656    139049     261775       564360   (990000 samples)
+
+=== pipeline_demo --queue mutex (run 1 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=mutex (MutexQueue, spinning) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             902    532155     799902      1111985   (990000 samples)
+feed->strategy        1682    549860     808255      1116152   (990000 samples)
+
+=== pipeline_demo --queue mutex (run 2 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=mutex (MutexQueue, spinning) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             685    488404    2844422      3627171   (990000 samples)
+feed->strategy        1198    491070    3416684      4050714   (990000 samples)
+
+=== pipeline_demo --queue mutex (run 3 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=mutex (MutexQueue, spinning) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             668     32009      94831       158195   (990000 samples)
+feed->strategy        1052     42992     123615       511120   (990000 samples)
+
+=== pipeline_demo --queue seqcst (run 1 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=seqcst (SpscQueueSeqCst) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             156      7166      37541        92693   (990000 samples)
+feed->strategy         328     11499      43796       281668   (990000 samples)
+
+=== pipeline_demo --queue seqcst (run 2 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=seqcst (SpscQueueSeqCst) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             152      3117      32247       109469   (990000 samples)
+feed->strategy         324      7538     138517       432247   (990000 samples)
+
+=== pipeline_demo --queue seqcst (run 3 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=seqcst (SpscQueueSeqCst) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             154     20993     153908       911574   (990000 samples)
+feed->strategy         318     35591     895741      1815195   (990000 samples)
+
+=== pipeline_demo --queue acqrel (run 1 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=acqrel (SpscQueueAcqRel, padded) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             154      7611      57839       282314   (990000 samples)
+feed->strategy         324     13427      76779       294601   (990000 samples)
+
+=== pipeline_demo --queue acqrel (run 2 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=acqrel (SpscQueueAcqRel, padded) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             155      3625      31031        62532   (990000 samples)
+feed->strategy         321      6115      34088        70543   (990000 samples)
+
+=== pipeline_demo --queue acqrel (run 3 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=acqrel (SpscQueueAcqRel, padded) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             150   2276113    6657973      7430639   (990000 samples)
+feed->strategy         287   3136550    6912529      7468557   (990000 samples)
+
+=== pipeline_demo --queue acqrel-unpadded (run 1 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=acqrel-unpadded (SpscQueueAcqRel, UNPADDED) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             390    692760    3235372      3724913   (990000 samples)
+feed->strategy         774   1311886    3549436      3992561   (990000 samples)
+
+=== pipeline_demo --queue acqrel-unpadded (run 2 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=acqrel-unpadded (SpscQueueAcqRel, UNPADDED) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             380     31812    1003815      1494994   (990000 samples)
+feed->strategy         773     42345    1259608      1804774   (990000 samples)
+
+=== pipeline_demo --queue acqrel-unpadded (run 3 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=acqrel-unpadded (SpscQueueAcqRel, UNPADDED) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             156      3649      40224       125513   (990000 samples)
+feed->strategy         315      6912      52484       262263   (990000 samples)
+
+=== pipeline_demo --queue cached (run 1 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=cached (SpscQueueCached) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             113      2405      23809       174122   (990000 samples)
+feed->strategy         235      3429      28373       174789   (990000 samples)
+
+=== pipeline_demo --queue cached (run 2 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=cached (SpscQueueCached) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             357     16971      53491       156912   (990000 samples)
+feed->strategy         547     22726      59822       159621   (990000 samples)
+
+=== pipeline_demo --queue cached (run 3 of 3) ===
+pipeline_demo v2 | compiler: 15.2.0
+queue=cached (SpscQueueCached) items=1000000 interval_ns=1000 warmup=10000 seed=88172645463325252 capacity=4096 hw_threads=8
+clock resolution: 41 ns
+pinning: feed cpu 2, book cpu 3, strategy cpu 4
+received=1000000 order_violations=0 buy_signals=582692 sell_signals=401664 checksum=9551793491979621364
+matches single-threaded reference: yes
+stage (ns)             p50       p99      p99.9          max
+feed->book             121      1890      12495        42669   (990000 samples)
+feed->strategy         242      3071      15269        49592   (990000 samples)

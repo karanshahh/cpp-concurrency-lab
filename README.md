@@ -108,11 +108,11 @@ What changed, and what it cost or bought (filled in only from measurements; see 
 
 | Cost in the previous step | Change | Measured effect |
 |---|---|---|
-| a lock taken on every push and pop; producer and consumer contend for it (v1) | lock-free SPSC with atomics | -- |
-| sleeping and waking through the kernel (v1 cv queue) | spinning on atomics | -- |
-| `seq_cst` ordering stronger than the algorithm needs | acquire/release orders | -- |
-| head and tail on one cache line | each index padded to its own line | -- |
-| every call reads the other core's index | cached private copies, refreshed when full/empty | -- |
+| a lock taken on every push and pop; producer and consumer contend for it (v1) | lock-free SPSC with atomics | throughput 2.94-5.53 -> 13.67-25.56 Mops/s (same run) |
+| sleeping and waking through the kernel (v1 cv queue) | spinning on atomics | p50 5,020-5,555 ns (cv) -> 146-149 ns (acq/rel) |
+| `seq_cst` ordering stronger than the algorithm needs | acquire/release orders | no measurable difference on aarch64 (p50 147-156 vs 146-149 ns) |
+| head and tail on one cache line | each index padded to its own line | queue p99 6,247-166,960 -> 665-1,657 ns; counters 308.9-353.9 -> 42.8-44.7 ms |
+| every call reads the other core's index | cached private copies, refreshed when full/empty | p50 146-149 -> 106-119 ns; throughput ranges overlap (15.62-17.98 vs 13.67-25.56) |
 
 ## Data
 
@@ -196,36 +196,50 @@ Output matched the single-threaded reference (1,000,000 received, 0 order violat
 |---|---|---|---|---|
 | feed->book | 6,921 | 7,005,470 | 10,748,415 | 11,249,162 |
 | feed->strategy | 16,478 | 7,066,825 | 10,812,372 | 11,292,288 |
+Host load during this run was not controlled (Chrome was likely open on the Mac).
 <!-- v1-results:end -->
 
 ### v2 (VM numbers)
 
 <!-- v2-results:begin -->
-Machine, compiler, flags, workload, seed, pinning: --
+Machine: OrbStack Ubuntu VM on an Apple Silicon Mac (aarch64, 8 vCPUs, kernel 7.2.12-orbstack), GCC 15.2.0,
+`-O3 -DNDEBUG`, no sanitizers, host not idle (Chrome open, idle). Clock resolution: 41 ns.
+Raw output: `results/vm-v2-20261025-141841.txt`, measured at commit `46998a2`.
+
+Queues: 1 producer pinned to CPU 2, 1 consumer pinned to CPU 3, capacity 1024, 3 runs. Throughput: 2,000,000 items,
+unthrottled. Latency: 500,000 items paced every 2,000 ns, first 20,000 discarded. Seed: n/a (fixed schedule).
+All six queues ran in the same process, one after another, with identical operations.
 
 | Queue | Throughput (Mops/s) | p50 (ns) | p99 (ns) | p99.9 (ns) | max (ns) |
 |---|---|---|---|---|---|
-| MutexQueue (lock + spin) | -- | -- | -- | -- | -- |
-| BoundedBlockingQueue (cv) | -- | -- | -- | -- | -- |
-| SpscQueueSeqCst | -- | -- | -- | -- | -- |
-| SpscQueueAcqRel (padded) | -- | -- | -- | -- | -- |
-| SpscQueueAcqRel (unpadded) | -- | -- | -- | -- | -- |
-| SpscQueueCached | -- | -- | -- | -- | -- |
+| MutexQueue (lock + spin) | 2.94-4.04 | 314-10,002,301 | 53,429-199,083,596 | 208,753-204,059,708 | 592,927-204,847,874 |
+| BoundedBlockingQueue (cv) | 5.17-5.53 | 5,020-5,555 | 51,382-56,729 | 129,960-2,020,873 | 303,846-2,709,080 |
+| SpscQueueSeqCst | 16.12-19.29 | 147-156 | 709-5,490 | 13,528-38,836 | 78,382-162,728 |
+| SpscQueueAcqRel (padded) | 15.62-17.98 | 146-149 | 665-1,657 | 7,733-35,336 | 47,464-251,467 |
+| SpscQueueAcqRel (unpadded) | 14.56-18.28 | 153-161 | 6,247-166,960 | 37,220-2,261,317 | 319,832-3,183,108 |
+| SpscQueueCached | 13.67-25.56 | 106-119 | 1,474-15,557 | 41,420-57,837 | 159,481-669,344 |
 
-Pipeline (`pipeline_demo`, feed->strategy, ns), 3 runs per queue with identical arguments, ranges across runs:
+Pipeline (`pipeline_demo`, feed->strategy, ns): 1,000,000 ticks paced every 1,000 ns, first 10,000 discarded,
+seed 88172645463325252, capacity 4096, feed/book/strategy pinned to CPUs 2/3/4, 3 runs per queue, ranges across runs.
+All 18 runs matched the single-threaded reference (1,000,000 received, 0 order violations).
 
 | Queue | p50 | p99 | p99.9 | max |
 |---|---|---|---|---|
-| cv | -- | -- | -- | -- |
-| mutex | -- | -- | -- | -- |
-| seqcst | -- | -- | -- | -- |
-| acqrel | -- | -- | -- | -- |
-| acqrel-unpadded | -- | -- | -- | -- |
-| cached | -- | -- | -- | -- |
+| cv | 24,871-27,303 | 139,049-187,597 | 261,775-621,532 | 564,360-866,373 |
+| mutex | 1,052-1,682 | 42,992-549,860 | 123,615-3,416,684 | 511,120-4,050,714 |
+| seqcst | 318-328 | 7,538-35,591 | 43,796-895,741 | 281,668-1,815,195 |
+| acqrel | 287-324 | 6,115-3,136,550 | 34,088-6,912,529 | 70,543-7,468,557 |
+| acqrel-unpadded | 315-774 | 6,912-1,311,886 | 52,484-3,549,436 | 262,263-3,992,561 |
+| cached | 235-547 | 3,071-22,726 | 15,269-59,822 | 49,592-174,789 |
 
-False sharing (`false_sharing`, ms, range across runs): adjacent -- / padded --
+False sharing (`false_sharing`, 20,000,000 increments per thread, threads pinned to CPUs 2 and 3, 3 runs):
+adjacent counters 308.9-353.9 ms, padded counters 42.8-44.7 ms.
 
-What did not help or surprised us: --
+What did not help or surprised us:
+- `seq_cst` vs acquire/release: no measurable difference on this machine (p50 147-156 ns vs 146-149 ns; throughput ranges overlap).
+- v1's 7 ms pipeline p99 did not reproduce with identical code (139,049-187,597 ns here).
+- Several queues had one run in three with millisecond tails (one MutexQueue run had a 10 ms median), so tails on this
+  shared VM are not reliable comparisons.
 <!-- v2-results:end -->
 
 The v1 table above and the v2 table come from different harness versions only if v1 was measured from its own tag. To compare
@@ -247,13 +261,27 @@ v1 and v2 queues use the rows of the **same** v2 run (`MutexQueue` and `BoundedB
   4,096-slot queues fill, and because latency counts from each tick's scheduled time, that waiting shows up (as it should).
 - **To measure next:** the pipeline repeated 3 times; the pipeline at slower tick rates (2,000 and 5,000 ns) to find
   where the backlog disappears; the same workloads on lock-free SPSC queues (v2).
+- **Update after v2:** the same cv pipeline, with identical code and arguments, gave a p99 of 139,049-187,597 ns in
+  three v2 runs. The 7 ms p99 above did not reproduce, so it was likely host interference on the shared VM, not
+  backlog inherent to the cv queue. The backlog hypothesis above is not supported.
 <!-- v1-shown:end -->
 
 <!-- v2-shown:begin -->
 ### v2
-- **Shown (measured):** --
-- **Likely (hypothesis, not yet shown):** --
-- **To measure next:** --
+- **Shown (measured):** in the same run, the lock-free SPSC queues move 13.67-25.56 million messages per second against
+  2.94-5.53 million for the lock-based queues, and their median latency is 106-161 ns against 5,020-5,555 ns for the cv queue.
+  `seq_cst` and acquire/release are indistinguishable here. False sharing is large: two threads incrementing adjacent
+  counters take 308.9-353.9 ms, padded counters 42.8-44.7 ms (about 7-8 times faster); in the queue, the unpadded
+  variant's p99 (6,247-166,960 ns) is 4-100 times the padded one's (665-1,657 ns). The cached queue has the lowest median
+  (106-119 ns), and in the pipeline it was the only queue whose three runs all stayed under 175 us max. Every pipeline run,
+  on every queue, matched the single-threaded reference.
+- **Likely (hypothesis, not yet shown):** the SPSC advantage comes from avoiding the lock and the kernel wake-up. `seq_cst`
+  costs nothing extra here because on AArch64 both orders compile to the same `ldar`/`stlr` instructions; on x86 a
+  `seq_cst` store needs a heavier instruction. The cached queue's lower median comes from reading the other core's index less
+  often. The millisecond outlier runs are host interference: the VM's vCPUs share the Mac's cores with everything else.
+- **To measure next:** the same benchmarks on a rented x86 Linux machine with nothing else running (`seq_cst` vs
+  acquire/release, and tails); more runs per case (for example 10) to count how often outlier runs happen; the pipeline at
+  slower tick rates.
 <!-- v2-shown:end -->
 
 ## Repository layout
